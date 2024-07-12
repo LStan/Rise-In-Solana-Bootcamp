@@ -1,3 +1,4 @@
+use borsh::{BorshDeserialize, BorshSerialize};
 use {
     solana_program::{
         account_info::{next_account_info, AccountInfo},
@@ -14,11 +15,16 @@ use {
     },
 };
 
+#[derive(Debug, BorshSerialize, BorshDeserialize)]
+pub struct TransferArgs {
+    pub amount: u64,
+}
+
 solana_program::entrypoint!(process_instruction);
 pub fn process_instruction(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
-    _instruction_data: &[u8],
+    instruction_data: &[u8],
 ) -> ProgramResult {
     // Create an iterator to safely reference accounts in the slice
     let account_info_iter = &mut accounts.iter();
@@ -40,7 +46,11 @@ pub fn process_instruction(
     // The program transfers everything out of its account, so extract that from
     // the account data.
     let source_account = Account::unpack(&source_info.try_borrow_data()?)?;
-    let amount = source_account.amount;
+    // let amount = source_account.amount;
+    let amount = TransferArgs::try_from_slice(instruction_data)?.amount;
+    if amount > source_account.amount {
+        return Err(ProgramError::InsufficientFunds);
+    }
 
     // The program uses `transfer_checked`, which requires the number of decimals
     // in the mint, so extract that from the account data too.

@@ -127,11 +127,13 @@ async fn success() {
     );
     banks_client.process_transaction(transaction).await.unwrap();
 
+    let transfer_amount = 1_000_u64;
+
     // Create an instruction following the account order expected by the program
     let transaction = Transaction::new_signed_with_payer(
         &[Instruction::new_with_bincode(
             program_id,
-            &(),
+            &transfer_amount.to_le_bytes(),
             vec![
                 AccountMeta::new(source.pubkey(), false),
                 AccountMeta::new_readonly(mint.pubkey(), false),
@@ -148,12 +150,21 @@ async fn success() {
     // See that the transaction processes successfully
     banks_client.process_transaction(transaction).await.unwrap();
 
-    // Check that the destination account now has `amount` tokens
+    // Check that the destination account now has `transfer_amount` tokens
     let account = banks_client
         .get_account(destination.pubkey())
         .await
         .unwrap()
         .unwrap();
     let token_account = Account::unpack(&account.data).unwrap();
-    assert_eq!(token_account.amount, amount);
+    assert_eq!(token_account.amount, transfer_amount);
+
+    // Check that the source account now has `amount` - `transfer_amount` tokens
+    let account = banks_client
+        .get_account(source.pubkey())
+        .await
+        .unwrap()
+        .unwrap();
+    let token_account = Account::unpack(&account.data).unwrap();
+    assert_eq!(token_account.amount, amount - transfer_amount);
 }
